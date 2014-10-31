@@ -68,30 +68,32 @@ namespace curryNS {
     template<class curry, class A0>
     using next_curry = curry_t<::curryDetails::curry_helper<std::decay_t<function_type<curry>>, std::decay_t<A0>>>;
 
+    // 3 invoke_ overloads
+    // The first is one argument when invoking f with A0 does not work:
+    template<class curry, class A0>
+    auto invoke_(std::false_type, curry&& self, A0&&a0 )->
+    RETURNS(next_curry<curry, A0>{std::forward<curry>(self).f,std::forward<A0>(a0)});
+
+    // This is the 2+ argument overload where invoking with the arguments does not work
+    // invoke a chain of the top one:
+    template<class curry, class A0, class A1, class... Args>
+    auto invoke_(std::false_type, curry&& self, A0&&a0, A1&& a1, Args&&... args )->
+    RETURNS(std::forward<curry>(self)(std::forward<A0>(a0))(std::forward<A1>(a1), std::forward<Args>(args)...));
+
+    // This is the any number of argument overload when it is a valid call to f:
+    template<class curry, class...Args>
+    auto invoke_(std::true_type, curry&& self, Args&&...args )->
+    RETURNS(std::forward<curry>(self).f(std::forward<Args>(args)...));
+
     template<class F>
     struct curry_t : rvalue_invoke_support<curry_t<F>> {
         F f;
 
         template<class... U>curry_t(U&&...u):f(std::forward<U>(u)...){}
 
-        // 3 invoke overloads
-        // The first is one argument when invoking f with A0 does not work:
-        template<class curry, class A0>
-        friend auto invoke( curry&& self, A0&&a0 )->
-        std::enable_if_t<!is_invokable<function_type<curry>(A0)>::value,decltype(next_curry<curry, A0>{std::forward<curry_t>(self).f,std::forward<A0>(a0)})>
-        { return next_curry<curry, A0>{std::forward<curry_t>(self).f,std::forward<A0>(a0)}; }
-
-        // This is the 2+ argument overload where invoking with the arguments does not work
-        // invoke a chain of the top one:
-        template<class curry, class A0, class A1, class... Args>
-        friend auto invoke( curry&& self, A0&&a0, A1&& a1, Args&&... args )->
-        std::enable_if_t<!is_invokable<function_type<curry>(A0, A1, Args...)>::value,decltype(std::forward<curry>(self)(std::forward<A0>(a0))(std::forward<A1>(a1), std::forward<Args>(args)...))>
-        { return std::forward<curry>(self)(std::forward<A0>(a0))(std::forward<A1>(a1), std::forward<Args>(args)...); }
-
-        // This is the any number of argument overload when it is a valid call to f:
         template<class curry, class...Args>
         friend auto invoke( curry&& self, Args&&...args )->
-        RETURNS(std::forward<curry>(self).f(std::forward<Args>(args)...))
+        RETURNS(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...));
     };
 }
 
