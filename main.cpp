@@ -42,6 +42,10 @@ public:
 };
 
 namespace curryDetails {
+    template<class curry_helper, class...Args>
+    auto invoke( curry_helper&& self, Args&&... args)->
+    RETURNS( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) )
+
     // Curry helper is sort of a manual lambda.  It captures a function and one argument
     // It isn't written as a lambda so we can enable proper rvalue forwarding when it is
     // used in an rvalue context, which is important when currying:
@@ -57,10 +61,6 @@ namespace curryDetails {
         friend auto invoke( curry_helper&& self, Args&&... args)->
         decltype( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) );
     };
-
-    template<class curry_helper, class...Args>
-    auto invoke( curry_helper&& self, Args&&... args)->
-    RETURNS( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) )
 }
 
 namespace curryNS {
@@ -91,6 +91,10 @@ namespace curryNS {
     auto invoke_(std::true_type, curry&& self, Args&&...args )->
     RETURNS(std::forward<curry>(self).f(std::forward<Args>(args)...))
 
+    template<class curry, class...Args>
+    auto invoke( curry&& self, Args&&...args )->
+    RETURNS(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...))
+
     template<class F>
     struct curry_t : rvalue_invoke_support<curry_t<F>> {
         F f;
@@ -101,10 +105,6 @@ namespace curryNS {
         friend auto invoke( curry&& self, Args&&...args )->
           decltype(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...));
     };
-
-    template<class curry, class...Args>
-    auto invoke( curry&& self, Args&&...args )->
-    RETURNS(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...))
 }
 
 template<class F>
