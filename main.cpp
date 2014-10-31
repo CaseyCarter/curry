@@ -1,11 +1,13 @@
-#include <iostream>
+#include <type_traits>
 #include <utility>
-#include <memory>
 
+template<class...>
+struct voider { using type = void; };
 template<class...Ts>
-using void_t = std::conditional_t<true,void,std::tuple<Ts...>>;
-template<class T>using type=T;
-struct unused_type {};
+using void_t = typename voider<Ts...>::type;
+
+template<class T>
+using decay_t = typename std::decay<T>::type;
 
 template<class Sig,class=void>
 struct is_invokable:std::false_type {};
@@ -24,19 +26,19 @@ class rvalue_invoke_support {
 public:
   template<class...Args>
   auto operator()(Args&&...args)&->
-  RETURNS( invoke( self(), std::forward<Args>(args)... ) )
+  RETURNS( invoke( this->self(), std::forward<Args>(args)... ) )
 
   template<class...Args>
   auto operator()(Args&&...args)const&->
-  RETURNS( invoke( self(), std::forward<Args>(args)... ) )
+  RETURNS( invoke( this->self(), std::forward<Args>(args)... ) )
 
   template<class...Args>
   auto operator()(Args&&...args)&&->
-  RETURNS( invoke( std::move(self()), std::forward<Args>(args)... ) )
+  RETURNS( invoke( std::move(this->self()), std::forward<Args>(args)... ) )
 
   template<class...Args>
   auto operator()(Args&&...args)const&&->
-  RETURNS( invoke( std::move(self()), std::forward<Args>(args)... ) )
+  RETURNS( invoke( std::move(this->self()), std::forward<Args>(args)... ) )
 };
 
 namespace curryDetails {
@@ -53,8 +55,12 @@ namespace curryDetails {
 
         template<class curry_helper, class...Args>
         friend auto invoke( curry_helper&& self, Args&&... args)->
-        RETURNS( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) )
+        decltype( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) );
     };
+
+    template<class curry_helper, class...Args>
+    auto invoke( curry_helper&& self, Args&&... args)->
+    RETURNS( std::forward<curry_helper>(self).f( std::forward<curry_helper>(self).t, std::forward<Args>(args)... ) )
 }
 
 namespace curryNS {
@@ -66,24 +72,24 @@ namespace curryNS {
 
     // the next curry type if we chain given a new arg A0:
     template<class curry, class A0>
-    using next_curry = curry_t<::curryDetails::curry_helper<std::decay_t<function_type<curry>>, std::decay_t<A0>>>;
+    using next_curry = curry_t<::curryDetails::curry_helper<decay_t<function_type<curry>>, decay_t<A0>>>;
 
     // 3 invoke_ overloads
     // The first is one argument when invoking f with A0 does not work:
     template<class curry, class A0>
     auto invoke_(std::false_type, curry&& self, A0&&a0 )->
-    RETURNS(next_curry<curry, A0>{std::forward<curry>(self).f,std::forward<A0>(a0)});
+    RETURNS(next_curry<curry, A0>{std::forward<curry>(self).f,std::forward<A0>(a0)})
 
     // This is the 2+ argument overload where invoking with the arguments does not work
     // invoke a chain of the top one:
     template<class curry, class A0, class A1, class... Args>
     auto invoke_(std::false_type, curry&& self, A0&&a0, A1&& a1, Args&&... args )->
-    RETURNS(std::forward<curry>(self)(std::forward<A0>(a0))(std::forward<A1>(a1), std::forward<Args>(args)...));
+    RETURNS(std::forward<curry>(self)(std::forward<A0>(a0))(std::forward<A1>(a1), std::forward<Args>(args)...))
 
     // This is the any number of argument overload when it is a valid call to f:
     template<class curry, class...Args>
     auto invoke_(std::true_type, curry&& self, Args&&...args )->
-    RETURNS(std::forward<curry>(self).f(std::forward<Args>(args)...));
+    RETURNS(std::forward<curry>(self).f(std::forward<Args>(args)...))
 
     template<class F>
     struct curry_t : rvalue_invoke_support<curry_t<F>> {
@@ -93,12 +99,18 @@ namespace curryNS {
 
         template<class curry, class...Args>
         friend auto invoke( curry&& self, Args&&...args )->
-        RETURNS(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...));
+          decltype(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...));
     };
+
+    template<class curry, class...Args>
+    auto invoke( curry&& self, Args&&...args )->
+    RETURNS(invoke_(is_invokable<function_type<curry>(Args...)>{}, std::forward<curry>(self), std::forward<Args>(args)...))
 }
 
 template<class F>
-curryNS::curry_t<std::decay_t<F>> curry( F&& f ) { return {std::forward<F>(f)}; }
+curryNS::curry_t<decay_t<F>> curry( F&& f ) { return {std::forward<F>(f)}; }
+
+#include <iostream>
 
 static struct foo_t {
     double operator()(double x, int y, std::nullptr_t, std::nullptr_t)const{std::cout << "first\n"; return x*y;}
