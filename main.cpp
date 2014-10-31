@@ -14,8 +14,8 @@ template<class Sig,class=void>
 struct is_invokable:std::false_type {};
 template<class F, class... Ts>
 struct is_invokable<
-    F(Ts...),
-    void_t<decltype(std::declval<F>()(std::declval<Ts>()...))>
+  F(Ts...),
+  void_t<decltype(std::declval<F>()(std::declval<Ts>()...))>
 >:std::true_type {};
 
 #define RETURNS(...) decltype(__VA_ARGS__) { return (__VA_ARGS__); }
@@ -25,18 +25,18 @@ struct is_invokable<
 // used in an rvalue context, which is important when currying:
 template<class F, class T>
 struct curry_helper {
-    F f;
-    T t;
+  F f;
+  T t;
 
-    template<class...Args>
-    auto operator()(Args&&...args)const& ->
-      RETURNS(f(t, std::forward<Args>(args)...))
-    template<class...Args>
-    auto operator()(Args&&...args)& ->
-      RETURNS(f(t, std::forward<Args>(args)...))
-    template<class...Args>
-    auto operator()(Args&&...args)&& ->
-      RETURNS(std::move(f)(std::move(t), std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)const& ->
+    RETURNS(f(t, std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)& ->
+    RETURNS(f(t, std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)&& ->
+    RETURNS(std::move(f)(std::move(t), std::forward<Args>(args)...))
 };
 
 template <typename> struct curry_t;
@@ -61,17 +61,17 @@ auto apply(F&& f, Args&&...args) ->
 
 template<class F>
 struct curry_t {
-    F f;
+  F f;
 
-    template<class...Args>
-	auto operator()(Args&&...args)const& ->
-      RETURNS(apply(f, std::forward<Args>(args)...))
-    template<class...Args>
-	auto operator()(Args&&...args)& ->
-      RETURNS(apply(f, std::forward<Args>(args)...))
-    template<class...Args>
-	auto operator()(Args&&...args)&& ->
-      RETURNS(apply(std::move(f), std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)const& ->
+    RETURNS(apply(f, std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)& ->
+    RETURNS(apply(f, std::forward<Args>(args)...))
+  template<class...Args>
+  auto operator()(Args&&...args)&& ->
+    RETURNS(apply(std::move(f), std::forward<Args>(args)...))
 };
 
 template<class F>
@@ -83,38 +83,38 @@ auto curry(F&& f, Args&&...args) ->
   RETURNS(curry_t<decay_t<F>>{std::forward<F>(f)}(std::forward<Args>(args)...))
 
 constexpr struct foo_t {
-    double operator()(double x, int y, std::nullptr_t, std::nullptr_t)const{std::cout << "first\n"; return x*y;}
-    char operator()(char c, int x)const{std::cout << "second\n"; return c+x;}
-    void operator()(char const*s)const{std::cout << "hello " << s << "\n";}
+  double operator()(double x, int y, std::nullptr_t, std::nullptr_t)const{std::cout << "first\n"; return x*y;}
+  char operator()(char c, int x)const{std::cout << "second\n"; return c+x;}
+  void operator()(char const*s)const{std::cout << "hello " << s << "\n";}
 } foo{};
 
 struct print_t {
-    template <typename T>
-    auto operator()(std::ostream& os, T&& t) const ->
-      RETURNS(curry(*this, std::ref(os << t)))
+  template <typename T>
+  auto operator()(std::ostream& os, T&& t) const ->
+    RETURNS(curry(*this, std::ref(os << t)))
 };
 
 auto cout = curry(print_t{}, std::ref(std::cout));
 
 int main() {
-    cout("Hello,") (' ') ("World!") ('\n');
-	auto f = curry(foo);
-    // Call the 3rd overload:
-    f("world");
-    // testing the ability to "jump over" the second overload:
-    cout(f(3.14,10,nullptr)(nullptr)) ('\n');
-    // call the 2nd overload:
-    auto x = f('a',2);
-    cout(x) ("\n");
-    // again:
-    x = f('a')(2);
-    cout(x) ("\n")
-      (is_invokable<decltype(foo)(double, int)>{}) ("\n")
-      (is_invokable<decltype(foo)(double)>{}) ("\n")
-      (is_invokable<decltype(f)(double, int)>{}) ("\n")
-      (is_invokable<decltype(f)(double)>{}) ("\n")
-      (is_invokable<decltype(f(3.14))(int)>{}) ("\n");
-    decltype(std::declval<decltype((foo))>()(std::declval<double>(), std::declval<int>())) y = {3};
-    (void)y;
-	// std::cout << << "\n";
+  cout("Hello,") (' ') ("World!") ('\n');
+  auto f = curry(foo);
+  // Call the 3rd overload:
+  f("world");
+  // testing the ability to "jump over" the second overload:
+  cout(f(3.14,10,nullptr)(nullptr)) ('\n');
+  // call the 2nd overload:
+  auto x = f('a',2);
+  cout(x) ("\n");
+  // again:
+  x = f('a')(2);
+  cout(x) ("\n")
+    (is_invokable<decltype(foo)(double, int)>{}) ("\n")
+    (is_invokable<decltype(foo)(double)>{}) ("\n")
+    (is_invokable<decltype(f)(double, int)>{}) ("\n")
+    (is_invokable<decltype(f)(double)>{}) ("\n")
+    (is_invokable<decltype(f(3.14))(int)>{}) ("\n");
+  decltype(std::declval<decltype((foo))>()(std::declval<double>(), std::declval<int>())) y = {3};
+  (void)y;
+  // std::cout << << "\n";
 }
